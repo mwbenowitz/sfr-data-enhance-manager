@@ -48,10 +48,22 @@ exports.parseRecords = async (records) => {
 }
 
 exports.parseRecord = (record) => {
-  let payload = JSON.parse(new Buffer.from(record.kinesis.data, 'base64').toString('ascii'))
-  // TODO Handle non-200 input events
-  logger.notice('Parsing record with message: ' + payload.message)
+
   return new Promise((resolve, reject) => {
+    let payload
+    try {
+      payload = JSON.parse(new Buffer.from(record.kinesis.data, 'base64').toString('utf-8'))
+    } catch(err) {
+      reject({
+        'status': 'failure',
+        'code': 505,
+        'message': 'Invalid JSON found in data block'
+      })
+      return
+    }
+    // TODO Handle non-200 input events
+    logger.notice('Parsing record with message: ' + payload.message)
+
     if(payload.status !== 200){
       logger.error('Error recieved from fetcher, store for reprocessing')
       reject({
@@ -69,7 +81,7 @@ exports.parseRecord = (record) => {
     } else if(!payload.stage || STAGES.includes(payload.stage)) {
       if(payload.stage === 'new' || !payload.stage){
         logger.notice('Starting processing for new record')
-        payload['stage'] = 'mw'
+        payload['stage'] = 'oclc'
       } else {
         logger.notice('Passing record to processing stage after ' + payload.message)
       }
